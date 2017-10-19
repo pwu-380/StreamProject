@@ -8,30 +8,36 @@
 
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.InstancesHeader;
+import generators.NewLEDGenerator;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
 import moa.classifiers.trees.HoeffdingTree;
-import generators.NewLEDGenerator;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.HashMap;
 
-public class Experiment1 {
+public class Experiment2 {
 
     /*User Defined Parameters-----------------------------------------*/
-    private static final String RESULTS_FILE = "results/experiment1.csv";
+    private static final String RESULTS_FILE = "results/experiment2.csv";
     //Number of examples used to pre-train
     public static int PROBE_INSTANCES = 1;
     //If we want to balance class examples in pre-training
     public static boolean BALANCE_PROBE_SET = false;
     //Number of instances to produce after pre-training
-    public static int STREAM_SIZE = 10000;
+    public static int STREAM_SIZE = 48000;
+    //Number of instances to switch concepts
+    public static int INST_PER_CON = 6000;
+
     //Toggle use of buffers
     public static boolean USE_BUFFERS = false;
     //Define number of elements saved in each buffer
     private static final int BUFFER_SIZE = 10;
     //Sliding window size for prequential window;
-    private static final int PREQUENTIAL_WINDOW_SIZE = 50;
+    private static final int PREQUENTIAL_WINDOW_SIZE = 150;
 
     //First 7 attributes correspond to LED lights, next 17 are noise attributes and last is class
     //Named 'att1', 'att2', 'att3'..., 'class'
@@ -55,25 +61,37 @@ public class Experiment1 {
                 put(9.0, 9);
             }};
 
-    //For NewLEDGenerator this is the distribution of classes generated
-    private static final double[] CDIST = {5,5,25,5,1,5,5,5,5,5};
+    //For NewLEDGenerator this is the distribution of classes generated for each compositional concept
+    private static final double[][] CON = {
+            {1,5,5,5,5,5,5,5,5,25},
+            {5,5,5,5,1,5,25,5,5,5},
+            {5,5,25,5,1,5,5,5,5,5}
+    };
 
     //Classifier to user
-    private static Classifier clf = new HoeffdingTree();
+    private static Classifier clf = new NaiveBayesMultinomial();
 
     //This is appended to the top of the results file (just to keep track of test parameters)
     public static String ANNOTATION_STRING =
             String.format("<HEADER> GENERATOR: NewLEDGenerator(%d %d)", N_NOISE_ATTR, N_PCT) +
-            String.format("\tCLASS BALANCE: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
-            CDIST[0], CDIST[1], CDIST[2], CDIST[3], CDIST[4], CDIST[5], CDIST[6], CDIST[7], CDIST[8], CDIST[9]) +
-            String.format("\tCLASSIFIER: Hoeffding Tree") +
+            String.format("\tCONCEPT1: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
+                    CON[0][0], CON[0][1], CON[0][2], CON[0][3], CON[0][4], CON[0][5], CON[0][6], CON[0][7],
+                    CON[0][8], CON[0][9]) +
+            String.format("\tCONCEPT2: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
+                    CON[1][0], CON[1][1], CON[1][2], CON[1][3], CON[1][4], CON[1][5], CON[1][6], CON[1][7],
+                    CON[1][8], CON[1][9]) +
+            String.format("\tCONCEPT3: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
+                    CON[2][0], CON[2][1], CON[2][2], CON[2][3], CON[2][4], CON[2][5], CON[2][6], CON[2][7],
+                    CON[2][8], CON[2][9]) +
+            String.format("\tCLASSIFIER: Multinomial NB") +
             String.format("\tBUFFERED?: %b", USE_BUFFERS) +
             String.format("\tPROBE SIZE: %d", PROBE_INSTANCES) +
-            String.format("\tBUFFER_SIZE: %d", BUFFER_SIZE) +
-            String.format("\tPREQUENTIAL WINDOW SIZE: %d", PREQUENTIAL_WINDOW_SIZE);
+            String.format("\tBUFFER SIZE: %d", BUFFER_SIZE) +
+            String.format("\tPREQUENTIAL WINDOW SIZE: %d", PREQUENTIAL_WINDOW_SIZE) +
+            String.format("\tINSTANCES TO CONCEPT SWITCH: %d", INST_PER_CON);
 
     //Define how often to calculate metrics (accuracy, precision, etc.)
-    public static int CALC_METRICS_INTERVAL = 20;
+    public static int CALC_METRICS_INTERVAL = 100;
 
     /*Program-----------------------------------------*/
 
@@ -98,7 +116,6 @@ public class Experiment1 {
     /*Main-----------------------------------------*/
     public static void main(String[] args) {
         //Initialize the stream
-        STREAM.setClass_proportions(CDIST);
         STREAM.prepareForUse();
 
         //Get the stream attributes
@@ -144,34 +161,48 @@ public class Experiment1 {
             "PPV-3,TPR-3,PPV-4,TPR-4,PPV-5,TPR-5,PPV-6,TPR-6,PPV-7,TPR-7,PPV-8,TPR-8,PPV-9,TPR-9");
 
             num_instances = 0;
-            while (((current_inst = STREAM.nextInstance().getData()) != null) && (num_instances < STREAM_SIZE)){
-                //Predict and score
-                predictionMatrix.predictUpdate(current_inst);
-                num_instances++;
+            int loop_num = 0;
+            while (num_instances < STREAM_SIZE){
 
-                if (USE_BUFFERS) {
-                    //Adds new instance to buffers, if there exists at least one element in each buffer, then train
-                    handleTrainingCandidate(clf, instanceBuffer, current_inst);
-                } else {
-                    //Otherwise just train on whatever instance comes out
-                    clf.trainOnInstance(current_inst);
+                STREAM.setClass_proportions(CON[loop_num % CON.length]);
+
+                for (int i = 0; i < INST_PER_CON; i++) {
+
+                    if (num_instances >= STREAM_SIZE){
+                        break;
+                    }
+
+                    //Predict and score
+                    current_inst = STREAM.nextInstance().getData();
+                    predictionMatrix.predictUpdate(current_inst);
+                    num_instances++;
+
+                    if (USE_BUFFERS) {
+                        //Adds new instance to buffers, if there exists at least one element in each buffer, then train
+                        handleTrainingCandidate(clf, instanceBuffer, current_inst);
+                    } else {
+                        //Otherwise just train on whatever instance comes out
+                        clf.trainOnInstance(current_inst);
+                    }
+
+                    //At regular intervals, check how our classifier is performing
+                    if (num_instances % CALC_METRICS_INTERVAL == 0) {
+                        writer.printf("\n%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f",
+                                num_instances, predictionMatrix.calcAccuracy(),
+                                predictionMatrix.calcPrecision(0), predictionMatrix.calcRecall(0),
+                                predictionMatrix.calcPrecision(1), predictionMatrix.calcRecall(1),
+                                predictionMatrix.calcPrecision(2), predictionMatrix.calcRecall(2),
+                                predictionMatrix.calcPrecision(3), predictionMatrix.calcRecall(3),
+                                predictionMatrix.calcPrecision(4), predictionMatrix.calcRecall(4),
+                                predictionMatrix.calcPrecision(5), predictionMatrix.calcRecall(5),
+                                predictionMatrix.calcPrecision(6), predictionMatrix.calcRecall(6),
+                                predictionMatrix.calcPrecision(7), predictionMatrix.calcRecall(7),
+                                predictionMatrix.calcPrecision(8), predictionMatrix.calcRecall(8),
+                                predictionMatrix.calcPrecision(9), predictionMatrix.calcRecall(9));
+                    }
                 }
 
-                //At regular intervals, check how our classifier is performing
-                if (num_instances % CALC_METRICS_INTERVAL == 0) {
-                    writer.printf("\n%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f",
-                            num_instances, predictionMatrix.calcAccuracy(),
-                            predictionMatrix.calcPrecision(0),predictionMatrix.calcRecall(0),
-                            predictionMatrix.calcPrecision(1),predictionMatrix.calcRecall(1),
-                            predictionMatrix.calcPrecision(2),predictionMatrix.calcRecall(2),
-                            predictionMatrix.calcPrecision(3),predictionMatrix.calcRecall(3),
-                            predictionMatrix.calcPrecision(4),predictionMatrix.calcRecall(4),
-                            predictionMatrix.calcPrecision(5),predictionMatrix.calcRecall(5),
-                            predictionMatrix.calcPrecision(6),predictionMatrix.calcRecall(6),
-                            predictionMatrix.calcPrecision(7),predictionMatrix.calcRecall(7),
-                            predictionMatrix.calcPrecision(8),predictionMatrix.calcRecall(8),
-                            predictionMatrix.calcPrecision(9),predictionMatrix.calcRecall(9));
-                }
+                loop_num++;
             }
             writer.close();
             predictionMatrix.printMatrix();
