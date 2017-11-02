@@ -12,6 +12,7 @@ import generators.NewLEDGenerator;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
 import detectors.PerfSim;
+import moa.classifiers.trees.HoeffdingTree;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -19,7 +20,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
 
-//Now we're testing a data stream with drift detection
+//Now we're testing an LED data stream with drift detection
 public class Experiment4 {
 
     /*User Defined Parameters-----------------------------------------*/
@@ -48,7 +49,8 @@ public class Experiment4 {
 
     //Drift Detector
     private static PerfSim DETECTOR;                 //Detects change based on cosine similarity of confusion matrices
-    private static double ALARM_THRESHOLD = 0.95;    //Alarm threshold
+    private static double ALARM_THRESHOLD = 0.94;    //Alarm threshold
+    private static int DRIFT_TEST_WINDOW = 300;      //How often two confusion matrices are compared
 
     //Define a mapping of each class to a buffer
     //The key is what is returned when we check Instance.classValue
@@ -74,7 +76,7 @@ public class Experiment4 {
     };
 
     //Classifier to user
-    private static Classifier clf = new NaiveBayesMultinomial();
+    private static Classifier clf = new HoeffdingTree();
 
     //This is appended to the top of the results file (just to keep track of test parameters)
     public static String ANNOTATION_STRING =
@@ -88,7 +90,7 @@ public class Experiment4 {
             String.format("\tCONCEPT3: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
                     CON[2][0], CON[2][1], CON[2][2], CON[2][3], CON[2][4], CON[2][5], CON[2][6], CON[2][7],
                     CON[2][8], CON[2][9]) +
-            String.format("\tCLASSIFIER: Multinomial NB") +
+            String.format("\tCLASSIFIER: Hoeffding Tree") +
             String.format("\tDRIFT DETECTOR: PerfSim(%.2f)", ALARM_THRESHOLD) +
             String.format("\tBUFFERED?: %b", USE_BUFFERS) +
             String.format("\tPROBE SIZE: %d", PROBE_INSTANCES) +
@@ -169,13 +171,12 @@ public class Experiment4 {
 
             num_instances = 0;
             int loop_num = 0;
+            boolean reset = false;
+            boolean drift;
 
             while (num_instances < STREAM_SIZE){
 
                 STREAM.setClass_proportions(CON[loop_num % CON.length]);
-
-                boolean reset = false;
-                boolean drift;
 
                 for (int i = 0; i < INST_PER_CON; i++) {
 
@@ -211,7 +212,10 @@ public class Experiment4 {
                                 predictionMatrix.calcPrecision(8), predictionMatrix.calcRecall(8),
                                 predictionMatrix.calcPrecision(9), predictionMatrix.calcRecall(9));
 
-                        //Test for concept drift
+                    }
+
+                    //Test for concept drift
+                    if (num_instances % DRIFT_TEST_WINDOW == 0){
                         drift = DETECTOR.testDrift(predictionMatrix.getMatrix());
                         if (drift && reset){
                             clf.resetLearning();
@@ -220,7 +224,6 @@ public class Experiment4 {
                         } else if (!drift && !reset){
                             reset = true;
                         }
-
                     }
                 }
 
