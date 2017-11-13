@@ -21,6 +21,7 @@ public class PredictionMatrix {
     private boolean windowed = false;   //Without a sliding window it just records all test results
     private int windowLength = 0;       //Width of sliding window
 
+    private int[] lastPrediction;
     private Queue<Integer[]> window;    //Test results for all samples in the window
     private int matrix[][];             //"Confusion matrix"
 
@@ -42,11 +43,11 @@ public class PredictionMatrix {
             window = new LinkedList<>();
         }
 
-        matrix =  new int[numClasses][numClasses];
+        matrix = new int[numClasses][numClasses];
     }
 
     //Tests a single instance and records results
-    public void predictUpdate (Instance instance){
+    public boolean predictUpdate (Instance instance){
         int actualClass = (int) classes.get(instance.classValue());
         int predictedClass = Utils.maxIndex(model.getVotesForInstance(instance));
         Integer[] pair = {actualClass, predictedClass};
@@ -60,10 +61,22 @@ public class PredictionMatrix {
             }
         }
 
-        //Updates matrix
+        //Class updates
         matrix[actualClass][predictedClass]++;
+        lastPrediction = new int[]{actualClass, predictedClass};
+
+        //Returns whether the prediction was correct
+        return actualClass == predictedClass;
     }
 
+    public void resetMatrix(){
+        matrix = new int[numClasses][numClasses];
+    }
+
+    public int[] getLastPrediction () {
+        return lastPrediction;
+
+    }
 
     /*These methods pertain to calculating various metrics from the matrix----------------------*/
     //Calculates the precision with respect to a specific class
@@ -135,7 +148,6 @@ public class PredictionMatrix {
         }
         return correct/total;
     }
-
 
     /*These methods pertain to information retrieval from the matrix----------------------*/
     //Returns confusion matrix
