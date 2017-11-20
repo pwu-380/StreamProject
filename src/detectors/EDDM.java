@@ -1,11 +1,14 @@
 /**
  * Created by Peter on 11/4/2017.
+ * This class implements the EDDM drift detector as described in "Early Drift Detection Method"
+ * (Baena-Garcia et. al, 2006)
  */
 
-import java.util.Arrays;
+package detectors;
 
-//This class implements the EDDM drift detector as described in "Early Drift Detection Method"
-//(Baena-Garcia et. al, 2006)
+import core.PredictionMatrix;
+
+
 public class EDDM extends AbstractChangeDetectorNew{
     private double pPrime;                          //Average distance between errors
     private double sPrime;                          //Std of distance between errors

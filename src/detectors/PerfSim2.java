@@ -1,9 +1,13 @@
 /**
  * Created by Peter on 10/30/2017.
+ * This class implements the PerfSim drift detector as described in "The PerfSim Algorithm for Concept Drift Detection
+ * in Imbalanced Data" (Antwi et. al, 2012)
  */
 
-//This class implements the PerfSim drift detector as described in "The PerfSim Algorithm for Concept Drift Detection
-//in Imbalanced Data" (Antwi et. al, 2012)
+package detectors;
+
+import core.PredictionMatrix;
+
 public class PerfSim2 extends AbstractChangeDetectorNew{
     private int[] previousVector;               //Stores the vector to compare to
     private int size;                           //Size of the above

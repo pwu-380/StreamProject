@@ -2,6 +2,10 @@
  * Created by Peter on 11/12/2017.
  */
 
+package detectors;
+
+import core.PredictionMatrix;
+
 //Change detector contract
 //The original MOA class was way too bulky
 public abstract class AbstractChangeDetectorNew {

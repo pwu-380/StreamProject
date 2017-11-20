@@ -1,18 +1,18 @@
 /**
- * Created by Peter on 9/22/2017.
- * Testing buffering/unbuffering prediction performance on superminority/supermajority classes.
- * Tried setting 0 to superminority (1/5 normal proportion) and 9 to supermajority (5x normal proportion) on LED
- * data set.
- * Real life applications, may see imbalance ratios of 1:1000 or 1:5000 (e.g. fraud detection) [Krawczyk 2016]
+ * Created by Peter on 11/02/2017.
+ * LED stream with concept drift (in class proportions) tested with incremental multinomial NB and VFDT classifiers
+ * with undersampling buffer on and off, tested with drift detectors EDDM, FHDDM, Perfsim
  */
 
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.InstancesHeader;
-import generators.NewLEDGenerator;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
-import detectors.PerfSim;
 import moa.classifiers.trees.HoeffdingTree;
+import core.PredictionMatrix;
+import core.InstanceBuffer;
+import generators.NewLEDGenerator;
+import detectors.PerfSim2;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -48,8 +48,8 @@ public class Experiment4 {
     private static NewLEDGenerator STREAM = new NewLEDGenerator(N_NOISE_ATTR, N_PCT);
 
     //Drift Detector
-    private static PerfSim DETECTOR;                 //Detects change based on cosine similarity of confusion matrices
-    private static double ALARM_THRESHOLD = 0.94;    //Alarm threshold
+    private static PerfSim2 DETECTOR;                //Detects change based on cosine similarity of confusion matrices
+    private static double ALARM_THRESHOLD = 0.98;    //Alarm threshold
     private static int DRIFT_TEST_WINDOW = 300;      //How often two confusion matrices are compared
 
     //Define a mapping of each class to a buffer
@@ -76,7 +76,7 @@ public class Experiment4 {
     };
 
     //Classifier to user
-    private static Classifier clf = new HoeffdingTree();
+    private static Classifier clf = new NaiveBayesMultinomial();
 
     //This is appended to the top of the results file (just to keep track of test parameters)
     public static String ANNOTATION_STRING =
@@ -90,7 +90,7 @@ public class Experiment4 {
             String.format("\tCONCEPT3: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
                     CON[2][0], CON[2][1], CON[2][2], CON[2][3], CON[2][4], CON[2][5], CON[2][6], CON[2][7],
                     CON[2][8], CON[2][9]) +
-            String.format("\tCLASSIFIER: Hoeffding Tree") +
+            String.format("\tCLASSIFIER: MultinomialNB") +
             String.format("\tDRIFT DETECTOR: PerfSim(%.2f)", ALARM_THRESHOLD) +
             String.format("\tBUFFERED?: %b", USE_BUFFERS) +
             String.format("\tPROBE SIZE: %d", PROBE_INSTANCES) +
@@ -161,7 +161,7 @@ public class Experiment4 {
 
         //Begins prequential test than train
         PredictionMatrix predictionMatrix = new PredictionMatrix(clf, CLASSES, PREQUENTIAL_WINDOW_SIZE);
-        DETECTOR = new PerfSim(predictionMatrix.getMatrix(), ALARM_THRESHOLD);
+        DETECTOR = new PerfSim2(predictionMatrix, ALARM_THRESHOLD);
 
         try{
             PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(RESULTS_FILE)));
@@ -172,7 +172,7 @@ public class Experiment4 {
             num_instances = 0;
             int loop_num = 0;
             boolean reset = false;
-            boolean drift;
+            int drift;
 
             while (num_instances < STREAM_SIZE){
 
@@ -216,12 +216,16 @@ public class Experiment4 {
 
                     //Test for concept drift
                     if (num_instances % DRIFT_TEST_WINDOW == 0){
-                        drift = DETECTOR.testDrift(predictionMatrix.getMatrix());
-                        if (drift && reset){
+                        //Per change detector:
+                        //0 indicates drift
+                        //1 indicates stable
+                        //2 indicates warn
+                        drift = DETECTOR.testDrift();
+                        if ((drift == 0) && reset){
                             clf.resetLearning();
                             reset = false;
                             System.out.println(String.format("Reset at %d", num_instances));
-                        } else if (!drift && !reset){
+                        } else if ((drift > 0) && !reset){
                             reset = true;
                         }
                     }

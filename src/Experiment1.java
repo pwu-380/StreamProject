@@ -11,6 +11,8 @@ import com.yahoo.labs.samoa.instances.InstancesHeader;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
 import moa.classifiers.trees.HoeffdingTree;
+import core.PredictionMatrix;
+import core.InstanceBuffer;
 import generators.NewLEDGenerator;
 
 import java.io.*;
@@ -59,14 +61,14 @@ public class Experiment1 {
     private static final double[] CDIST = {5,5,25,5,1,5,5,5,5,5};
 
     //Classifier to user
-    private static Classifier clf = new HoeffdingTree();
+    private static Classifier clf = new NaiveBayesMultinomial();
 
     //This is appended to the top of the results file (just to keep track of test parameters)
     public static String ANNOTATION_STRING =
             String.format("<HEADER> GENERATOR: NewLEDGenerator(%d %d)", N_NOISE_ATTR, N_PCT) +
             String.format("\tCLASS BALANCE: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
             CDIST[0], CDIST[1], CDIST[2], CDIST[3], CDIST[4], CDIST[5], CDIST[6], CDIST[7], CDIST[8], CDIST[9]) +
-            String.format("\tCLASSIFIER: Hoeffding Tree") +
+            String.format("\tCLASSIFIER: Multinomial NB") +
             String.format("\tBUFFERED?: %b", USE_BUFFERS) +
             String.format("\tPROBE SIZE: %d", PROBE_INSTANCES) +
             String.format("\tBUFFER_SIZE: %d", BUFFER_SIZE) +

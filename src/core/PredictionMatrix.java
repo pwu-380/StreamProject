@@ -4,6 +4,8 @@
  * test samples
  */
 
+package core;
+
 import com.yahoo.labs.samoa.instances.Instance;
 import moa.classifiers.Classifier;
 import moa.core.Utils;

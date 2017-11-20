@@ -1,19 +1,20 @@
 /**
- * Created by Peter on 9/22/2017.
- * Testing buffering/unbuffering prediction performance on superminority/supermajority classes.
- * Tried setting 0 to superminority (1/5 normal proportion) and 9 to supermajority (5x normal proportion) on LED
- * data set.
- * Real life applications, may see imbalance ratios of 1:1000 or 1:5000 (e.g. fraud detection) [Krawczyk 2016]
+ * Created by Peter on 11/04/2017.
+ * STAGGER stream with concept drift (in class proportions) tested with incremental multinomial NB and VFDT classifiers
+ * with undersampling buffer on and off, tested with drift detectors EDDM, FHDDM, Perfsim
  */
 
 import com.yahoo.labs.samoa.instances.Instance;
 import com.yahoo.labs.samoa.instances.InstancesHeader;
-import detectors.PerfSim;
-import generators.NewLEDGenerator;
-import generators.NewSTAGGERGenerator;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
+import moa.classifiers.trees.HoeffdingAdaptiveTree;
 import moa.classifiers.trees.HoeffdingTree;
+import core.PredictionMatrix;
+import core.InstanceBuffer;
+import detectors.PerfSim2;
+import generators.NewLEDGenerator;
+import generators.NewSTAGGERGenerator;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -53,7 +54,7 @@ public class Experiment5 {
     private static final boolean BALANCED = false;
 
     //Drift Detector
-    private static PerfSim DETECTOR;                 //Detects change based on cosine similarity of confusion matrices
+    private static PerfSim2 DETECTOR;                 //Detects change based on cosine similarity of confusion matrices
     private static double ALARM_THRESHOLD = 0.98;    //Alarm threshold
     private static int DRIFT_TEST_WINDOW = 300;      //How often two confusion matrices are compared
 
@@ -68,12 +69,12 @@ public class Experiment5 {
             }};
 
     //Classifier to user
-    private static Classifier clf = new HoeffdingTree();
+    private static Classifier clf = new HoeffdingAdaptiveTree();
 
     //This is appended to the top of the results file (just to keep track of test parameters)
     public static String ANNOTATION_STRING =
             String.format("<HEADER> GENERATOR: NewSTAGGERGenerator") +
-            String.format("\tCLASSIFIER: Hoeffding Tree") +
+            String.format("\tCLASSIFIER: Adaptive Hoeffding Tree") +
             String.format("\tDRIFT DETECTOR: PerfSim(%.2f)", ALARM_THRESHOLD) +
             String.format("\tBUFFERED?: %b", USE_BUFFERS) +
             String.format("\tPROBE SIZE: %d", PROBE_INSTANCES) +
@@ -145,7 +146,7 @@ public class Experiment5 {
 
         //Begins prequential test than train
         PredictionMatrix predictionMatrix = new PredictionMatrix(clf, CLASSES, PREQUENTIAL_WINDOW_SIZE);
-        DETECTOR = new PerfSim(predictionMatrix.getMatrix(), ALARM_THRESHOLD);
+        DETECTOR = new PerfSim2(predictionMatrix, ALARM_THRESHOLD);
 
         try{
             PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(RESULTS_FILE)));
@@ -155,7 +156,7 @@ public class Experiment5 {
             num_instances = 0;
             int loop_num = 0;
             boolean reset = false;
-            boolean drift;
+            int drift;
 
             while (num_instances < STREAM_SIZE){
 
@@ -190,12 +191,12 @@ public class Experiment5 {
 
                     //Test for concept drift
                     if (num_instances % DRIFT_TEST_WINDOW == 0){
-                        drift = DETECTOR.testDrift(predictionMatrix.getMatrix());
-                        if (drift && reset){
+                        drift = DETECTOR.testDrift();
+                        if ((drift == 0) && reset){
                             clf.resetLearning();
                             reset = false;
                             System.out.println(String.format("Reset at %d", num_instances));
-                        } else if (!drift && !reset){
+                        } else if ((drift > 0) && !reset){
                             reset = true;
                         }
                     }

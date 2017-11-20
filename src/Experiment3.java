@@ -1,5 +1,5 @@
 /**
- * Created by Peter on 9/22/2017.
+ * Created by Peter on 10/27/2017.
  * Testing buffering/unbuffering prediction performance on superminority/supermajority classes.
  * Tried setting 0 to superminority (1/5 normal proportion) and 9 to supermajority (5x normal proportion) on LED
  * data set.
@@ -13,6 +13,8 @@ import generators.NewSTAGGERGenerator;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
 import moa.classifiers.trees.HoeffdingTree;
+import core.InstanceBuffer;
+import core.PredictionMatrix;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;

@@ -1,9 +1,8 @@
 /**
- * Created by Peter on 9/22/2017.
+ * Created by Peter on 10/12/2017.
  * Testing buffering/unbuffering prediction performance on superminority/supermajority classes.
- * Tried setting 0 to superminority (1/5 normal proportion) and 9 to supermajority (5x normal proportion) on LED
- * data set.
- * Real life applications, may see imbalance ratios of 1:1000 or 1:5000 (e.g. fraud detection) [Krawczyk 2016]
+ * LED stream with concept drift (in class proportions) tested with incremental multinomial NB and VFDT classifiers
+ * with undersampling buffer on and off.
  */
 
 import com.yahoo.labs.samoa.instances.Instance;
@@ -11,7 +10,10 @@ import com.yahoo.labs.samoa.instances.InstancesHeader;
 import generators.NewLEDGenerator;
 import moa.classifiers.Classifier;
 import moa.classifiers.bayes.NaiveBayesMultinomial;
+import moa.classifiers.trees.HoeffdingAdaptiveTree;
 import moa.classifiers.trees.HoeffdingTree;
+import core.PredictionMatrix;
+import core.InstanceBuffer;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -33,7 +35,7 @@ public class Experiment2 {
     public static int INST_PER_CON = 6000;
 
     //Toggle use of buffers
-    public static boolean USE_BUFFERS = false;
+    public static boolean USE_BUFFERS = true;
     //Define number of elements saved in each buffer
     private static final int BUFFER_SIZE = 10;
     //Sliding window size for prequential window;
@@ -69,7 +71,7 @@ public class Experiment2 {
     };
 
     //Classifier to user
-    private static Classifier clf = new NaiveBayesMultinomial();
+    private static Classifier clf = new HoeffdingAdaptiveTree();
 
     //This is appended to the top of the results file (just to keep track of test parameters)
     public static String ANNOTATION_STRING =
@@ -83,7 +85,7 @@ public class Experiment2 {
             String.format("\tCONCEPT3: 0=%.1f 1=%.1f 2=%.1f 3=%.1f 4=%.1f 5=%.1f 6=%.1f 7=%.1f 8=%.1f 9=%.1f",
                     CON[2][0], CON[2][1], CON[2][2], CON[2][3], CON[2][4], CON[2][5], CON[2][6], CON[2][7],
                     CON[2][8], CON[2][9]) +
-            String.format("\tCLASSIFIER: Multinomial NB") +
+            String.format("\tCLASSIFIER: Adaptive Hoeffding Tree") +
             String.format("\tBUFFERED?: %b", USE_BUFFERS) +
             String.format("\tPROBE SIZE: %d", PROBE_INSTANCES) +
             String.format("\tBUFFER SIZE: %d", BUFFER_SIZE) +
