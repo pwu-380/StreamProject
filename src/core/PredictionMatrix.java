@@ -26,6 +26,7 @@ public class PredictionMatrix {
     private int[] lastPrediction;
     private Queue<Integer[]> window;    //Test results for all samples in the window
     private int matrix[][];             //"Confusion matrix"
+    private int numElements;            //Number of elements stored in matrix
 
     /*These methods pertain to the construction/maintenance of the matrix----------------------*/
     //Constructor for non-windowed matrix
@@ -60,7 +61,11 @@ public class PredictionMatrix {
             if (window.size() > windowLength){
                 Integer[] removed = window.remove();
                 matrix[removed[0]][removed[1]]--;
+            } else {
+                numElements++;
             }
+        } else {
+            numElements++;
         }
 
         //Class updates
@@ -105,7 +110,7 @@ public class PredictionMatrix {
     public double calcRecall (int classInd){
         double truePositive = matrix[classInd][classInd];           //Positive and correctly predicted
         double recall;
-        double classGenerated = Arrays.stream(matrix[classInd]).sum();   //All actual positives e.g. TP + FN
+        double classGenerated = Arrays.stream(matrix[classInd]).sum();   //All actual positives i.e. TP + FN
 
         if (classGenerated == 0){
             recall = -1;                                            //Identifies indeterminate case
@@ -113,6 +118,34 @@ public class PredictionMatrix {
             recall = truePositive/classGenerated;                   //Otherwise calculates as normal
         }
         return recall;
+    }
+
+    //Calculates the specificity with respect to a specific class
+    //-1 indicates an indeterminate case
+    public double calcSpecificity (int classInd){
+        double specificity;
+        double classGenerated = Arrays.stream(matrix[classInd]).sum();   //All actual positives i.e. TP + FN
+
+        if (classGenerated == numElements){
+            specificity = -1;                                       //Identifies indeterminate case
+        } else {
+            double falsePositive = 0;                               //False positives
+
+            //Calculates the false positives
+            for (int row = 0; row < numClasses; row++){
+                falsePositive += matrix[row][classInd];
+            }
+            falsePositive -= matrix[classInd][classInd];
+
+            //Calculates the true negatives
+            double trueNegative = numElements;
+            trueNegative -= classGenerated;
+            trueNegative -= falsePositive;
+
+            specificity = trueNegative/(trueNegative + falsePositive);
+        }
+
+        return specificity;
     }
 
     //Calculates the fscore with respect to a specific class
