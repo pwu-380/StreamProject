@@ -18,6 +18,7 @@ public class EDDM extends AbstractChangeDetectorNew{
     private int nErrors;                            //Number of errors
     private int lastInterval;                       //Interval between errors
 
+
     public EDDM (PredictionMatrix predictionMatrix){
         //0.90 and 0.95 are the default values for alarm and warn as advised in BG 2006
         this(predictionMatrix, 0.90, 0.95);
@@ -25,20 +26,23 @@ public class EDDM extends AbstractChangeDetectorNew{
 
     public EDDM (PredictionMatrix predictionMatrix, double alarmThreshold){
         //0.90 and 0.95 are the default values for alarm and warn as advised in BG 2006
-        super(predictionMatrix, alarmThreshold);
-        pPrime = 0;
-        sPrime = 0;
-        varPrime = 0;
-        nErrors = 0;
-        lastInterval = 0;
+        super(predictionMatrix, alarmThreshold, alarmThreshold);
+        resetEDDM();
     }
 
     public EDDM (PredictionMatrix predictionMatrix, double alarmThreshold, double warnThreshold){
         super(predictionMatrix, alarmThreshold, warnThreshold);
+        resetEDDM();
+    }
+
+    //Resets class variables
+    private void resetEDDM (){
+        nErrors = 0;
+        pMax = 0;
+        sMax = 0;
         pPrime = 0;
         sPrime = 0;
         varPrime = 0;
-        nErrors = 0;
         lastInterval = 0;
     }
 
@@ -90,8 +94,7 @@ public class EDDM extends AbstractChangeDetectorNew{
                 if (driftLevel < warnThreshold){
                     if (driftLevel < alarmThreshold){
                         drift = 0;
-                        pMax = 0;
-                        sMax = 0;
+                        resetEDDM();
                     } else {
                         drift = 2;
                     }
